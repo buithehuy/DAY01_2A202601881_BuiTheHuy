@@ -11,17 +11,14 @@ from tests._loader import MOD
 
 
 def _make_stream(text: str):
-    """Tạo mock stream: cắt text thành các chunk giống OpenAI streaming."""
+    """Tạo mock stream giống Google Gen AI SDK."""
     chunks = []
     for piece in (text[: len(text) // 2], text[len(text) // 2 :]):
         chunk = MagicMock()
-        chunk.choices = [MagicMock()]
-        chunk.choices[0].delta.content = piece
+        chunk.text = piece
         chunks.append(chunk)
-    # Chunk cuối có delta.content = None — giống stream thật, code phải xử lý
     final = MagicMock()
-    final.choices = [MagicMock()]
-    final.choices[0].delta.content = None
+    final.text = None
     chunks.append(final)
     return chunks
 
@@ -32,23 +29,23 @@ class TestStreamingChatbot(unittest.TestCase):
         self.assertTrue(callable(MOD.streaming_chatbot))
 
     @patch("builtins.input", side_effect=["quit"])
-    @patch("openai.OpenAI")
-    def test_exits_on_quit(self, MockOpenAI, mock_input):
+    @patch("google.genai.Client")
+    def test_exits_on_quit(self, MockClient, mock_input):
         """Chatbot phải thoát sạch khi người dùng gõ 'quit'."""
         mock_client = MagicMock()
-        MockOpenAI.return_value = mock_client
+        MockClient.return_value = mock_client
         try:
             MOD.streaming_chatbot()
         except StopIteration:
             pass  # input() hết side_effect — chấp nhận được
 
     @patch("builtins.input", side_effect=["Xin chào", "quit"])
-    @patch("openai.OpenAI")
-    def test_streams_one_turn_with_stream_true(self, MockOpenAI, mock_input):
-        """Một lượt chat phải gọi API với stream=True."""
+    @patch("google.genai.Client")
+    def test_streams_one_turn(self, MockClient, mock_input):
+        """Một lượt chat phải gọi API streaming của Gemini."""
         mock_client = MagicMock()
-        MockOpenAI.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _make_stream("Chào bạn!")
+        MockClient.return_value = mock_client
+        mock_client.models.generate_content_stream.return_value = _make_stream("Chào bạn!")
 
         try:
             MOD.streaming_chatbot()
@@ -56,11 +53,9 @@ class TestStreamingChatbot(unittest.TestCase):
             pass
 
         self.assertTrue(
-            mock_client.chat.completions.create.called,
-            "Phải gọi API khi người dùng nhập tin nhắn",
+            mock_client.models.generate_content_stream.called,
+            "Phải gọi generate_content_stream khi người dùng nhập tin nhắn",
         )
-        _, kwargs = mock_client.chat.completions.create.call_args
-        self.assertTrue(kwargs.get("stream", False), "Phải gọi API với stream=True")
 
 
 class TestRetryWithBackoff(unittest.TestCase):

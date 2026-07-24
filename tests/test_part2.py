@@ -11,21 +11,19 @@ from unittest.mock import MagicMock, patch
 from tests._loader import MOD
 
 
-def _make_openai_response(text: str = "Hello from OpenAI"):
-    choice = MagicMock()
-    choice.message.content = text
+def _make_gemini_response(text: str = "Hello from Gemini"):
     resp = MagicMock()
-    resp.choices = [choice]
+    resp.text = text
     return resp
 
 
 class TestChatWithSystemPrompt(unittest.TestCase):
 
-    @patch("openai.OpenAI")
-    def test_returns_tuple_str_float(self, MockOpenAI):
+    @patch("google.genai.Client")
+    def test_returns_tuple_str_float(self, MockClient):
         mock_client = MagicMock()
-        MockOpenAI.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _make_openai_response("OK")
+        MockClient.return_value = mock_client
+        mock_client.models.generate_content.return_value = _make_gemini_response("OK")
 
         result = MOD.chat_with_system_prompt("Bạn là giáo viên.", "Chào bạn")
 
@@ -35,40 +33,31 @@ class TestChatWithSystemPrompt(unittest.TestCase):
         self.assertIsInstance(result[1], float)
         self.assertGreater(result[1], 0.0)
 
-    @patch("openai.OpenAI")
-    def test_messages_contain_system_and_user_roles(self, MockOpenAI):
+    @patch("google.genai.Client")
+    def test_contents_and_system_instruction_are_sent(self, MockClient):
         mock_client = MagicMock()
-        MockOpenAI.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _make_openai_response()
+        MockClient.return_value = mock_client
+        mock_client.models.generate_content.return_value = _make_gemini_response()
 
         system_prompt = "Bạn là chuyên gia lịch sử Việt Nam."
         user_prompt = "Nhà Trần có bao nhiêu đời vua?"
         MOD.chat_with_system_prompt(system_prompt, user_prompt)
 
-        _, kwargs = mock_client.chat.completions.create.call_args
-        messages = kwargs.get("messages")
-        self.assertIsNotNone(messages, "Phải truyền messages= vào create()")
-        roles = [m["role"] for m in messages]
-        self.assertIn("system", roles)
-        self.assertIn("user", roles)
+        _, kwargs = mock_client.models.generate_content.call_args
+        self.assertEqual(kwargs.get("contents"), user_prompt)
+        self.assertIn("system_instruction", kwargs.get("config", {}))
 
-    @patch("openai.OpenAI")
-    def test_system_prompt_content_is_sent(self, MockOpenAI):
+    @patch("google.genai.Client")
+    def test_system_prompt_content_is_sent(self, MockClient):
         mock_client = MagicMock()
-        MockOpenAI.return_value = mock_client
-        mock_client.chat.completions.create.return_value = _make_openai_response()
+        MockClient.return_value = mock_client
+        mock_client.models.generate_content.return_value = _make_gemini_response()
 
         system_prompt = "PERSONA_DAC_BIET_XYZ"
         MOD.chat_with_system_prompt(system_prompt, "Câu hỏi")
 
-        _, kwargs = mock_client.chat.completions.create.call_args
-        system_contents = [
-            m["content"] for m in kwargs.get("messages", []) if m["role"] == "system"
-        ]
-        self.assertTrue(
-            any(system_prompt in c for c in system_contents),
-            "Nội dung system_prompt phải nằm trong message role='system'",
-        )
+        _, kwargs = mock_client.models.generate_content.call_args
+        self.assertEqual(kwargs.get("config", {}).get("system_instruction"), system_prompt)
 
 
 class TestCountTokens(unittest.TestCase):
@@ -123,10 +112,10 @@ class TestEstimateCost(unittest.TestCase):
             places=10,
         )
 
-    def test_mini_is_cheaper_than_gpt4o(self):
-        cost_4o = MOD.estimate_cost(self.PROMPT, self.RESPONSE, model="gpt-4o")
-        cost_mini = MOD.estimate_cost(self.PROMPT, self.RESPONSE, model="gpt-4o-mini")
-        self.assertLess(cost_mini["total_cost"], cost_4o["total_cost"])
+    def test_flash_is_cheaper_than_pro(self):
+        pro = MOD.estimate_cost(self.PROMPT, self.RESPONSE, model="gemini-2.5-pro")
+        flash = MOD.estimate_cost(self.PROMPT, self.RESPONSE, model="gemini-2.5-flash")
+        self.assertLess(flash["total_cost"], pro["total_cost"])
 
 
 if __name__ == "__main__":
