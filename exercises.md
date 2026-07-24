@@ -29,6 +29,8 @@ mỗi lần trung bình ~350 token đầu ra.
 trường hợp GPT-4o xứng đáng với chi phí và một trường hợp nên dùng mini:**
 > *Câu trả lời của bạn*
 
+
+
 ---
 
 ## Block 2 — System Prompt & Token (trả lời sau Checkpoint 2)

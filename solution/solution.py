@@ -47,7 +47,7 @@ GEMINI_FLASH_MODEL = os.getenv("LAB_MINI_MODEL", "gemini-2.5-flash")
 def call_gemini(
     prompt: str,
     model: str = GEMINI_MODEL,
-    temperature: float = 0.1,
+    temperature: float = 0.7,
     top_p: float = 0.9,
     max_tokens: int = 256,
 ) -> tuple[str, float]:
@@ -543,7 +543,7 @@ def format_comparison_table(results: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Entry point — demo chạy thật (cần GEMINI_API_KEY)
+# Entry point — demo
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     print("=== So sánh model ===")
